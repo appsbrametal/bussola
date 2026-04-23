@@ -305,17 +305,32 @@ html,body{height:100%;font-family:'Sora',sans-serif;background:var(--g1);color:v
 let db={}, cfg={url:'',interval:10};
 let cameraOn=false, stream=null, scanTimer=null, cooldown=false, lastScanned=null, syncTimer=null;
 
-(function init(){
+// Init roda somente após TODOS os scripts externos carregarem
+window.addEventListener('load', function init(){
+  // 1. Carrega configuração salva
   try{cfg=JSON.parse(localStorage.getItem('bussola-cfg')||'{}');}catch(_){}
   cfg.url=cfg.url||''; cfg.interval=cfg.interval??10;
+
+  // 2. Carrega dados salvos localmente (exibe imediatamente sem esperar rede)
   try{db=JSON.parse(localStorage.getItem('bussola-db')||'{}');}catch(_){}
+
+  // 3. Preenche campos de config na tela
   document.getElementById('cfg-url').value=cfg.url;
   document.getElementById('cfg-interval').value=cfg.interval;
+
+  // 4. Mostra dados locais imediatamente se existirem
   if(Object.keys(db).length>1) atualizarUI();
-  if(cfg.url){iniciarSyncAuto(); sincronizar();}
+
+  // 5. Dispara sincronização automática ao abrir — sem mostrar erro visual,
+  //    pois é o carregamento inicial (erros só são exibidos em syncs manuais)
+  if(cfg.url){
+    iniciarSyncAuto();
+    sincronizarSilencioso(); // sync automático sem mensagem de erro na tela
+  }
+
   document.getElementById('manual-op').addEventListener('keydown',e=>{if(e.key==='Enter')buscaManual();});
   if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
-})();
+});
 
 function switchTab(n){
   ['scan','config','dados'].forEach((s,i)=>{
@@ -391,6 +406,32 @@ async function tentarFetch(url){
     }catch(_){ /* tenta próximo proxy */ }
   }
   return null;
+}
+
+// Sincronização silenciosa: chamada automaticamente ao abrir o app.
+// Não exibe mensagem de erro — apenas atualiza os dados se conseguir.
+// O usuário não vê falha, pois os dados locais já estão visíveis.
+async function sincronizarSilencioso(){
+  if(!cfg.url) return;
+  const btn=document.getElementById('btn-sync');
+  btn.classList.add('spinning');
+  try{
+    const urlsParaTentar=montarUrls(cfg.url);
+    let buf=null, usedUrl=null;
+    for(const url of urlsParaTentar){
+      buf=await tentarFetch(url);
+      if(buf){usedUrl=url;break;}
+    }
+    if(buf){
+      processarBuf(buf,usedUrl);
+      toast('Planilha atualizada ✔');
+    }
+    // Se falhar silenciosamente, dados locais continuam disponíveis
+  }catch(_){
+    // falha silenciosa no carregamento automático
+  }finally{
+    btn.classList.remove('spinning');
+  }
 }
 
 async function sincronizar(){
