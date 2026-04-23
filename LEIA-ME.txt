@@ -1,0 +1,93 @@
+# Consulta WM — Guia de Instalação
+
+## Arquivos incluídos
+- `index.html` — App principal
+- `manifest.json` — Configuração PWA
+- `sw.js` — Service Worker (offline)
+- `icons/` — Ícones do app
+
+---
+
+## PASSO 1 — Hospedar no GitHub Pages (gratuito)
+
+1. Acesse https://github.com e crie uma conta (se não tiver)
+2. Clique em **"New repository"**
+3. Nome: `consulta-wm` | Marque **Public** | Clique em **Create**
+4. Na página do repositório, clique em **"uploading an existing file"**
+5. Arraste TODOS os arquivos desta pasta (inclusive a pasta `icons/`)
+6. Clique em **"Commit changes"**
+7. Vá em **Settings → Pages**
+8. Em "Source", selecione **"Deploy from branch"** → branch `main` → pasta `/root`
+9. Clique em **Save**
+10. Aguarde ~2 minutos. O app estará disponível em:
+    **https://SEU-USUARIO.github.io/consulta-wm/**
+
+---
+
+## PASSO 2 — Gerar o APK com PWABuilder (gratuito)
+
+1. Acesse https://www.pwabuilder.com
+2. Cole a URL do seu app: `https://SEU-USUARIO.github.io/consulta-wm/`
+3. Clique em **"Start"**
+4. Aguarde a análise (alguns segundos)
+5. Clique em **"Android"**
+6. Clique em **"Generate Package"**
+7. Baixe o arquivo `.apk` gerado
+
+---
+
+## PASSO 3 — Instalar nos celulares Android
+
+1. Transfira o `.apk` para o celular (WhatsApp, e-mail, pendrive, etc.)
+2. No celular, abra o arquivo `.apk`
+3. Se aparecer aviso de segurança: **Configurações → Instalar apps desconhecidos → Permitir**
+4. Instale normalmente
+5. O ícone "Consulta WM" aparecerá na tela inicial
+
+---
+
+## PASSO 4 — Configurar o SharePoint no app
+
+1. Abra o app no celular
+2. Toque na aba **⚙️ Configurar**
+3. No SharePoint, navegue até o arquivo `.xlsx`
+4. Clique em **"..." → Copiar link**
+5. Cole o link no campo e adicione `&download=1` no final
+6. Selecione o intervalo de sincronização desejado
+7. Toque em **💾 Salvar configuração**
+8. Toque em **🔄 Testar conexão agora**
+
+### Exemplo de URL do SharePoint:
+```
+https://suaempresa.sharepoint.com/sites/almoxarifado/_layouts/15/download.aspx?UniqueId=XXXX&download=1
+```
+
+---
+
+## ATUALIZAR a planilha
+
+O Setor A e B continuam editando a planilha normalmente no SharePoint.
+Os celulares do Setor C sincronizam automaticamente no intervalo configurado.
+Para forçar atualização imediata: toque no botão 🔄 no topo do app.
+
+---
+
+## Suporte offline
+
+O app funciona sem internet para consultas, usando os dados da última sincronização.
+A câmera e leitura de QR Code funcionam sempre, independente de internet.
+
+---
+
+## Estrutura da planilha (obrigatório)
+
+A planilha deve ter exatamente estas 3 colunas, **nesta ordem**:
+
+| Coluna 1        | Coluna 2 | Coluna 3      |
+|-----------------|----------|---------------|
+| Numero da OP    | Sigla    | Endereço WM   |
+| OP-2024-0001    | MAT-A    | A-01-03-02    |
+| OP-2024-0002    | MAT-B    |               |
+
+- Coluna 3 vazia = endereço pendente (Setor B ainda não preencheu)
+- O nome das colunas pode ser qualquer um — a posição é o que importa

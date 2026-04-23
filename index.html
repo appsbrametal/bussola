@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Bússula WM"/>
+<meta name="theme-color" content="#0a5c47"/>
+<title>Bússula WM</title>
+<link rel="manifest" href="manifest.json"/>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --gd: #0a5c47; --gm: #0F6E56; --gl: #1D9E75; --gp: #E1F5EE;
+  --ad: #633806; --ap: #FAEEDA;
+  --rd: #993C1D; --rp: #FAECE7;
+  --g0: #f9f9f7; --g1: #f4f4f2; --g2: #e8e8e4; --g4: #a0a09a; --g7: #444441; --g9: #1a1a18;
+  --w: #ffffff;
+  --rsm: 8px; --rmd: 12px; --rlg: 18px;
+  --st: env(safe-area-inset-top,0px); --sb: env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;font-family:'Sora',sans-serif;background:var(--g1);color:var(--g9);overscroll-behavior:none;-webkit-text-size-adjust:100%;}
+
+#app{display:flex;flex-direction:column;height:100dvh;max-width:480px;margin:0 auto;background:var(--w);overflow:hidden;}
+
+/* TOPBAR */
+.topbar{background:var(--gd);padding:calc(var(--st) + 12px) 16px 12px;display:flex;align-items:center;gap:10px;flex-shrink:0;z-index:10;}
+.tl{width:36px;height:36px;background:rgba(255,255,255,.15);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.ti-info{flex:1;min-width:0;}
+.ti-info h1{font-size:15px;font-weight:700;color:#fff;}
+.ti-info p{font-size:10px;color:rgba(255,255,255,.6);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tsync{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.12);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;flex-shrink:0;transition:background .15s;}
+.tsync:active{background:rgba(255,255,255,.28);}
+.tsync.spinning{animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* TABS */
+.tabs{display:flex;background:var(--w);border-bottom:1px solid var(--g2);flex-shrink:0;}
+.tab{flex:1;padding:10px 0 8px;font-family:'Sora',sans-serif;font-size:11px;font-weight:500;background:none;border:none;border-bottom:2.5px solid transparent;color:var(--g4);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;transition:all .15s;}
+.tab .ti{font-size:16px;}
+.tab.active{color:var(--gm);border-bottom-color:var(--gm);}
+
+/* SCREENS */
+.screen{display:none;flex-direction:column;flex:1;overflow-y:auto;overflow-x:hidden;padding:12px;gap:10px;padding-bottom:calc(12px + var(--sb));}
+.screen.active{display:flex;}
+
+/* CARDS */
+.card{background:var(--w);border:1px solid var(--g2);border-radius:var(--rmd);padding:14px;flex-shrink:0;}
+.clabel{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--g4);margin-bottom:10px;}
+
+/* ═══ RESULTADO ═══
+   Sempre no topo, tamanho compacto mas legível.
+   O QUADRANTE é o herói — fonte grande, fundo verde escuro.          */
+#result-area{flex-shrink:0;}
+
+.rbox{border-radius:var(--rlg);padding:12px 16px 14px;text-align:center;animation:popIn .22s cubic-bezier(.175,.885,.32,1.275);}
+@keyframes popIn{from{transform:scale(.9);opacity:0;}to{transform:scale(1);opacity:1;}}
+
+/* FOUND */
+.rf{background:var(--gd);}
+.rf .rlabel{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:2px;}
+.rf .rmain{font-family:'JetBrains Mono',monospace;font-size:58px;font-weight:700;color:#fff;line-height:1;margin:4px 0 8px;}
+.rf .rbadges{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;}
+.rf .rbadge{background:rgba(255,255,255,.14);border-radius:20px;padding:3px 11px;font-size:11px;font-weight:500;color:rgba(255,255,255,.88);}
+.rf .rbadge strong{color:#fff;}
+
+/* PENDING */
+.rp{background:var(--ap);border:1.5px solid #FAC775;}
+.rp .rlabel{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ad);opacity:.7;margin-bottom:2px;}
+.rp .rmain{font-size:18px;font-weight:600;color:var(--ad);margin:6px 0;}
+.rp .rbadges{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;}
+.rp .rbadge{background:rgba(99,56,6,.1);border-radius:20px;padding:3px 11px;font-size:11px;color:var(--ad);}
+
+/* NOT FOUND */
+.rn{background:var(--rp);border:1.5px solid #F0997B;}
+.rn .rlabel{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--rd);opacity:.7;margin-bottom:2px;}
+.rn .rmain{font-size:18px;font-weight:600;color:var(--rd);margin:6px 0;}
+.rn .rsub{font-size:11px;color:var(--rd);opacity:.75;margin-top:3px;}
+
+/* ═══ CÂMERA ═══
+   Altura FIXA para nunca empurrar o resultado para fora da tela.
+   Em telas muito pequenas usa 180px; padrão 220px.                   */
+#scanner-wrap{
+  width:100%;height:220px;
+  background:#000;border-radius:var(--rmd);
+  overflow:hidden;position:relative;flex-shrink:0;
+}
+@media(max-height:600px){#scanner-wrap{height:160px;}}
+
+#video{width:100%;height:100%;object-fit:cover;display:none;}
+#canvas-qr{display:none;}
+.sovl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+.sframe{width:50%;aspect-ratio:1;border:2px solid #5DCAA5;border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.5);}
+.sline{position:absolute;width:50%;height:2px;background:linear-gradient(90deg,transparent,#5DCAA5,transparent);animation:sl 2s ease-in-out infinite;}
+@keyframes sl{0%,100%{top:25%;}50%{top:73%;}}
+#cam-ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px;text-align:center;}
+#cam-ph .phi{font-size:30px;opacity:.4;}
+#cam-ph p{font-size:12px;color:rgba(255,255,255,.5);}
+
+/* BUTTONS */
+.btn{width:100%;padding:11px;font-family:'Sora',sans-serif;font-size:13px;font-weight:600;border:none;border-radius:var(--rsm);cursor:pointer;transition:all .15s;}
+.btn:active{transform:scale(.98);}
+.btn-g{background:var(--gm);color:#fff;}
+.btn-g:hover{background:var(--gd);}
+.btn-o{background:transparent;color:var(--gm);border:1.5px solid var(--gm);}
+
+/* SEARCH */
+.srow{display:flex;gap:8px;}
+.srow input{flex:1;font-family:'JetBrains Mono',monospace;font-size:14px;padding:10px 12px;background:var(--g1);border:1px solid var(--g2);border-radius:var(--rsm);color:var(--g9);outline:none;transition:border .15s;}
+.srow input:focus{border-color:var(--gl);background:var(--w);}
+.srow button{padding:10px 14px;background:var(--gm);color:#fff;font-family:'Sora',sans-serif;font-size:13px;font-weight:600;border:none;border-radius:var(--rsm);cursor:pointer;white-space:nowrap;}
+.srow button:active{background:var(--gd);}
+
+/* DIVIDER */
+.div{display:flex;align-items:center;gap:8px;color:var(--g4);font-size:11px;flex-shrink:0;}
+.div::before,.div::after{content:'';flex:1;height:1px;background:var(--g2);}
+
+/* CONFIG */
+.cff{margin-bottom:12px;}
+.cff label{display:block;font-size:11px;font-weight:600;color:var(--g7);margin-bottom:5px;}
+.cff input,.cff select{width:100%;font-family:'Sora',sans-serif;font-size:13px;padding:10px 12px;background:var(--g1);border:1px solid var(--g2);border-radius:var(--rsm);color:var(--g9);outline:none;transition:border .15s;}
+.cff input:focus{border-color:var(--gl);background:var(--w);}
+.cfh{font-size:11px;color:var(--g4);margin-top:4px;line-height:1.5;}
+.cfh code{font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--g1);padding:1px 5px;border-radius:4px;word-break:break-all;}
+
+.steps{list-style:none;counter-reset:steps;display:flex;flex-direction:column;gap:8px;}
+.steps li{counter-increment:steps;display:flex;align-items:flex-start;gap:10px;font-size:12px;color:var(--g7);line-height:1.5;}
+.steps li::before{content:counter(steps);min-width:20px;height:20px;background:var(--gm);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px;}
+
+/* BADGE */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+.bok{background:var(--gp);color:var(--gd);}
+.berr{background:var(--rp);color:var(--rd);}
+.binf{background:#E6F1FB;color:#0C447C;}
+
+/* STATS */
+.srow4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+.scell{background:var(--g0);border-radius:var(--rsm);padding:10px 6px;text-align:center;}
+.sn{font-size:19px;font-weight:700;color:var(--gm);}
+.sl{font-size:9px;color:var(--g4);margin-top:1px;font-weight:500;}
+
+/* TABLE */
+.tw{overflow-x:auto;border-radius:var(--rsm);border:1px solid var(--g2);margin-top:8px;}
+.tw table{width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:11px;}
+.tw th{background:var(--g1);color:var(--g4);padding:6px 8px;text-align:left;font-weight:600;font-size:9px;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;}
+.tw td{padding:5px 8px;border-top:1px solid var(--g2);color:var(--g7);white-space:nowrap;}
+.tw .tdq{font-weight:700;color:var(--gd);font-size:13px;}
+
+/* UPLOAD ZONE */
+.uz{border:1.5px dashed var(--gl);border-radius:var(--rsm);padding:18px 12px;text-align:center;cursor:pointer;transition:background .15s;}
+.uz:hover{background:var(--gp);}
+.uz .uzi{font-size:26px;margin-bottom:6px;}
+.uz p{font-size:12px;color:var(--g4);}
+.uz strong{color:var(--gm);}
+
+/* TOAST */
+#toast{position:fixed;bottom:calc(18px + var(--sb));left:50%;transform:translateX(-50%) translateY(70px);background:var(--g9);color:#fff;padding:8px 18px;border-radius:22px;font-size:12px;font-weight:500;white-space:nowrap;z-index:999;transition:transform .28s cubic-bezier(.175,.885,.32,1.275);pointer-events:none;}
+#toast.show{transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="topbar">
+    <div class="tl">🧭</div>
+    <div class="ti-info">
+      <h1>Bússula WM</h1>
+      <p id="topbar-status">Nenhuma planilha carregada</p>
+    </div>
+    <button class="tsync" id="btn-sync" onclick="sincronizar()" title="Sincronizar">🔄</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('scan')"><span class="ti">📷</span>Escanear</button>
+    <button class="tab" onclick="switchTab('config')"><span class="ti">⚙️</span>Configurar</button>
+    <button class="tab" onclick="switchTab('dados')"><span class="ti">📊</span>Dados</button>
+  </div>
+
+  <!-- ══ ESCANEAR ══ -->
+  <div id="screen-scan" class="screen active">
+
+    <!-- RESULTADO — fixo no topo, nunca coberto pela câmera -->
+    <div id="result-area">
+      <div class="rbox rn">
+        <div class="rlabel">Aguardando leitura</div>
+        <div class="rmain" style="font-size:28px;margin:8px 0;">—</div>
+        <div class="rsub">Escaneie o QR Code ou busque manualmente</div>
+      </div>
+    </div>
+
+    <!-- CÂMERA — altura fixa, não empurra resultado -->
+    <div class="card" style="padding:10px;">
+      <div class="clabel">QR Code da OP</div>
+      <div id="scanner-wrap">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="canvas-qr"></canvas>
+        <div class="sovl"><div class="sframe"></div><div class="sline"></div></div>
+        <div id="cam-ph"><div class="phi">📷</div><p>Toque em "Iniciar câmera"</p></div>
+      </div>
+      <div style="margin-top:8px;">
+        <button class="btn btn-g" id="btn-cam" onclick="toggleCamera()">Iniciar câmera</button>
+      </div>
+    </div>
+
+    <div class="div">ou busca manual</div>
+
+    <div class="card" style="padding:10px;">
+      <div class="srow">
+        <input type="text" id="manual-op" placeholder="Número da OP..." inputmode="numeric" autocomplete="off"/>
+        <button onclick="buscaManual()">Buscar</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══ CONFIGURAR ══ -->
+  <div id="screen-config" class="screen">
+
+    <div class="card">
+      <div class="clabel">Google Drive — Sincronização</div>
+      <div class="cff">
+        <label>URL de download direto do arquivo .xlsx</label>
+        <input type="url" id="cfg-url" placeholder="https://drive.google.com/uc?export=download&id=..."/>
+        <p class="cfh">Cole o link de download direto gerado pelo Google Drive (veja instruções abaixo).</p>
+      </div>
+      <div class="cff">
+        <label>Sincronização automática</label>
+        <select id="cfg-interval">
+          <option value="0">Somente manual (🔄)</option>
+          <option value="5">A cada 5 minutos</option>
+          <option value="10" selected>A cada 10 minutos</option>
+          <option value="30">A cada 30 minutos</option>
+          <option value="60">A cada 1 hora</option>
+        </select>
+      </div>
+      <button class="btn btn-g" onclick="salvarConfig()">💾 Salvar e sincronizar</button>
+      <div id="config-status" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="card">
+      <div class="clabel">Como obter o link do Google Drive</div>
+      <ol class="steps">
+        <li>Abra o Google Drive e localize o arquivo <strong>DADOS_BUSSULA.xlsx</strong></li>
+        <li>Clique com botão direito → <strong>Compartilhar</strong></li>
+        <li>Em "Acesso geral" selecione <strong>"Qualquer pessoa com o link"</strong> → Salvar</li>
+        <li>Clique em <strong>Copiar link</strong>. Será algo como:<br/><code>https://drive.google.com/file/d/<strong>SEUID</strong>/view?usp=sharing</code></li>
+        <li>Copie apenas o <strong>ID</strong> (trecho entre <code>/d/</code> e <code>/view</code>)</li>
+        <li>Monte a URL final assim:<br/><code>https://drive.google.com/uc?export=download&id=<strong>SEUID</strong></code></li>
+        <li>Cole essa URL no campo acima e toque em Salvar</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <div class="clabel">Upload manual (sem internet)</div>
+      <div class="uz" onclick="document.getElementById('file-input').click()">
+        <div class="uzi">📂</div>
+        <p><strong>Toque para selecionar o arquivo</strong></p>
+        <p style="font-size:11px;margin-top:2px;">.xlsx ou .csv</p>
+      </div>
+      <input type="file" id="file-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleUpload(event)"/>
+      <div id="upload-status" style="margin-top:8px;"></div>
+    </div>
+
+  </div>
+
+  <!-- ══ DADOS ══ -->
+  <div id="screen-dados" class="screen">
+    <div id="dados-vazio" class="card" style="text-align:center;padding:28px 16px;">
+      <div style="font-size:36px;margin-bottom:8px;">📋</div>
+      <p style="font-size:13px;font-weight:600;color:var(--g7);">Nenhum dado carregado</p>
+      <p style="font-size:11px;color:var(--g4);margin-top:4px;">Configure o Google Drive ou faça upload na aba ⚙️.</p>
+    </div>
+    <div id="dados-conteudo" style="display:none;flex-direction:column;gap:10px;">
+      <div class="card">
+        <div class="clabel">Resumo</div>
+        <div class="srow4" id="stats-row"></div>
+        <div style="margin-top:8px;" id="ultima-sync"></div>
+      </div>
+      <div class="card">
+        <div class="clabel">Prévia dos registros</div>
+        <div class="tw" id="tbl-preview"></div>
+        <p id="tbl-more" style="font-size:10px;color:var(--g4);margin-top:6px;"></p>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script>
+let db={}, cfg={url:'',interval:10};
+let cameraOn=false, stream=null, scanTimer=null, cooldown=false, lastScanned=null, syncTimer=null;
+
+(function init(){
+  try{cfg=JSON.parse(localStorage.getItem('bussola-cfg')||'{}');}catch(_){}
+  cfg.url=cfg.url||''; cfg.interval=cfg.interval??10;
+  try{db=JSON.parse(localStorage.getItem('bussola-db')||'{}');}catch(_){}
+  document.getElementById('cfg-url').value=cfg.url;
+  document.getElementById('cfg-interval').value=cfg.interval;
+  if(Object.keys(db).length>1) atualizarUI();
+  if(cfg.url){iniciarSyncAuto(); sincronizar();}
+  document.getElementById('manual-op').addEventListener('keydown',e=>{if(e.key==='Enter')buscaManual();});
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+
+function switchTab(n){
+  ['scan','config','dados'].forEach((s,i)=>{
+    document.querySelectorAll('.tab')[i].classList.toggle('active',s===n);
+    document.getElementById('screen-'+s).classList.toggle('active',s===n);
+  });
+}
+
+function salvarConfig(){
+  cfg.url=document.getElementById('cfg-url').value.trim();
+  cfg.interval=parseInt(document.getElementById('cfg-interval').value);
+  localStorage.setItem('bussola-cfg',JSON.stringify(cfg));
+  iniciarSyncAuto();
+  if(cfg.url) sincronizar();
+  else showStatus('config-status','err','⚠ Informe a URL do Google Drive');
+}
+
+function iniciarSyncAuto(){
+  clearInterval(syncTimer);
+  if(cfg.interval>0&&cfg.url) syncTimer=setInterval(sincronizar,cfg.interval*60*1000);
+}
+
+async function sincronizar(){
+  if(!cfg.url) return;
+  document.getElementById('btn-sync').classList.add('spinning');
+  try{
+    const proxy='https://corsproxy.io/?'+encodeURIComponent(cfg.url);
+    const res=await fetch(proxy);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    processarXLSX(await res.arrayBuffer());
+    showStatus('config-status','ok','✔ Sincronizado com Google Drive');
+    toast('Planilha atualizada ✔');
+  }catch(e){
+    showStatus('config-status','err','✘ '+e.message);
+    toast('Erro ao sincronizar');
+  }finally{
+    document.getElementById('btn-sync').classList.remove('spinning');
+  }
+}
+
+function handleUpload(e){
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=ev=>{processarXLSX(ev.target.result); showStatus('upload-status','ok','✔ '+f.name); toast('Planilha carregada ✔');};
+  r.readAsArrayBuffer(f);
+}
+
+// Colunas: OP | SIGLA | AREA | QUADRANTE | DESTINATÁRIO
+function processarXLSX(buf){
+  const wb=XLSX.read(buf,{type:'array'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+  db={};
+  const norm=k=>String(k).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  rows.forEach(r=>{
+    const keys=Object.keys(r);
+    const get=(names,fi)=>{
+      for(const k of keys) if(names.some(n=>norm(k).includes(n))) return String(r[k]||'').trim();
+      return String(r[keys[fi]]||'').trim();
+    };
+    const op  =get(['OP'],0);
+    const sig =get(['SIGLA'],1);
+    const area=get(['AREA'],2);
+    const quad=get(['QUADRANTE','QUAD'],3);
+    const dest=get(['DESTINATARIO','DEST'],4);
+    if(op) db[op]={sig,area,quad,dest};
+  });
+  const total=Object.keys(db).length;
+  const comQ=Object.values(db).filter(v=>v&&v.quad).length;
+  const areas=[...new Set(Object.values(db).filter(v=>v).map(v=>v.area).filter(Boolean))].length;
+  db.__meta={total,comQ,areas,cols:Object.keys(rows[0]||{}),preview:rows.slice(0,10),updated:new Date().toISOString()};
+  localStorage.setItem('bussola-db',JSON.stringify(db));
+  atualizarUI();
+}
+
+function atualizarUI(){
+  const m=db.__meta; if(!m) return;
+  document.getElementById('topbar-status').textContent=m.total+' OPs • '+m.comQ+' com quadrante';
+  document.getElementById('dados-vazio').style.display='none';
+  document.getElementById('dados-conteudo').style.display='flex';
+  const sq=m.total-m.comQ;
+  document.getElementById('stats-row').innerHTML=`
+    <div class="scell"><div class="sn">${m.total}</div><div class="sl">OPs</div></div>
+    <div class="scell"><div class="sn">${m.comQ}</div><div class="sl">Com quadrante</div></div>
+    <div class="scell" style="${sq>0?'background:var(--ap)':''}"><div class="sn" style="${sq>0?'color:var(--ad)':''}">${sq}</div><div class="sl">Sem quadrante</div></div>
+    <div class="scell"><div class="sn">${m.areas}</div><div class="sl">Áreas</div></div>`;
+  const dt=new Date(m.updated);
+  document.getElementById('ultima-sync').innerHTML=`<span class="badge binf">🕐 ${dt.toLocaleString('pt-BR')}</span>`;
+  const cols=m.cols.slice(0,5);
+  let html='<table><tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
+  m.preview.forEach(r=>{
+    html+='<tr>'+cols.map(c=>{
+      const v=r[c]||'—';
+      const isQ=c.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes('QUAD');
+      return `<td class="${isQ?'tdq':''}">${v}</td>`;
+    }).join('')+'</tr>';
+  });
+  html+='</table>';
+  document.getElementById('tbl-preview').innerHTML=html;
+  if(m.total>10) document.getElementById('tbl-more').textContent=`… e mais ${m.total-10} registros`;
+}
+
+function extrairOP(raw){
+  raw=String(raw||'').trim();
+  if(db[raw]) return raw;
+  try{
+    const u=new URL(raw);
+    for(const[,v] of u.searchParams) if(db[v]) return v;
+    const s=u.pathname.split('/').pop(); if(s&&db[s]) return s;
+  }catch(_){}
+  for(const re of [/\bOP[-_]?\s*(\d[\w-]*)/i,/(\d{5,})/]){
+    const m=raw.match(re); if(m){const c=(m[1]||m[0]).trim(); if(db[c]) return c;}
+  }
+  for(const t of raw.split(/[,;|\t\n]/)){const c=t.trim(); if(db[c]) return c;}
+  return raw;
+}
+
+function buscarOP(raw){
+  raw=String(raw||'').trim(); if(!raw) return;
+  if(Object.keys(db).length<=1){setRN('📋','Planilha não carregada','Configure o Google Drive na aba ⚙️'); return;}
+  const op=extrairOP(raw), d=db[op];
+  if(d&&d.quad) setRF(op,d);
+  else if(d)    setRP(op,d);
+  else          setRN(op,'OP não encontrada','Toque em 🔄 para atualizar a planilha');
+}
+
+function setRF(op,d){
+  document.getElementById('result-area').innerHTML=`
+    <div class="rbox rf">
+      <div class="rlabel">Quadrante de destino</div>
+      <div class="rmain">${d.quad}</div>
+      <div class="rbadges">
+        <span class="rbadge">📦 OP <strong>${op}</strong></span>
+        ${d.area?`<span class="rbadge">🏭 ${d.area}</span>`:''}
+        ${d.sig ?`<span class="rbadge">🏷 ${d.sig}</span>`:''}
+        ${d.dest?`<span class="rbadge">📬 ${d.dest}</span>`:''}
+      </div>
+    </div>`;
+}
+function setRP(op,d){
+  document.getElementById('result-area').innerHTML=`
+    <div class="rbox rp">
+      <div class="rlabel">Quadrante pendente</div>
+      <div class="rmain">⏳ Sem quadrante definido</div>
+      <div class="rbadges">
+        <span class="rbadge">OP ${op}</span>
+        ${d.area?`<span class="rbadge">${d.area}</span>`:''}
+        ${d.dest?`<span class="rbadge">${d.dest}</span>`:''}
+      </div>
+    </div>`;
+}
+function setRN(title,msg,sub){
+  document.getElementById('result-area').innerHTML=`
+    <div class="rbox rn">
+      <div class="rlabel">${title}</div>
+      <div class="rmain" style="font-size:20px;margin:6px 0;">${msg}</div>
+      ${sub?`<div class="rsub">${sub}</div>`:''}
+    </div>`;
+}
+
+function buscaManual(){buscarOP(document.getElementById('manual-op').value);}
+
+async function toggleCamera(){
+  if(cameraOn){stopCamera();return;}
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}});
+    const v=document.getElementById('video');
+    v.srcObject=stream; v.style.display='block';
+    document.getElementById('cam-ph').style.display='none';
+    await v.play();
+    cameraOn=true;
+    const b=document.getElementById('btn-cam');
+    b.textContent='⏹ Parar câmera'; b.classList.replace('btn-g','btn-o');
+    scanTimer=setInterval(scanFrame,200);
+  }catch(e){toast('Câmera: '+e.message);}
+}
+function stopCamera(){
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  stream=null; cameraOn=false; clearInterval(scanTimer);
+  document.getElementById('video').style.display='none';
+  document.getElementById('cam-ph').style.display='flex';
+  const b=document.getElementById('btn-cam');
+  b.textContent='Iniciar câmera'; b.classList.replace('btn-o','btn-g');
+}
+function scanFrame(){
+  const v=document.getElementById('video'), c=document.getElementById('canvas-qr');
+  if(!v.videoWidth) return;
+  c.width=v.videoWidth; c.height=v.videoHeight;
+  const ctx=c.getContext('2d'); ctx.drawImage(v,0,0);
+  const img=ctx.getImageData(0,0,c.width,c.height);
+  const qr=jsQR(img.data,img.width,img.height,{inversionAttempts:'dontInvert'});
+  if(qr&&qr.data&&!cooldown){
+    const op=qr.data.trim();
+    if(op!==lastScanned){
+      lastScanned=op;
+      document.getElementById('manual-op').value=op;
+      buscarOP(op);
+      cooldown=true; setTimeout(()=>{cooldown=false;},3000);
+    }
+  }
+}
+
+function showStatus(id,type,msg){
+  const el=document.getElementById(id); if(!el) return;
+  el.innerHTML=`<span class="badge ${type==='ok'?'bok':type==='err'?'berr':'binf'}">${msg}</span>`;
+}
+let _tt;
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('show'),2800);
+}
+</script>
+</body>
+</html>
