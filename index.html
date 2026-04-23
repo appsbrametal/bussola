@@ -223,8 +223,8 @@ html,body{height:100%;font-family:'Sora',sans-serif;background:var(--g1);color:v
       <div class="clabel">Google Drive — Sincronização</div>
       <div class="cff">
         <label>URL de download direto do arquivo .xlsx</label>
-        <input type="url" id="cfg-url" placeholder="https://drive.google.com/uc?export=download&id=..."/>
-        <p class="cfh">Cole o link de download direto gerado pelo Google Drive (veja instruções abaixo).</p>
+        <input type="url" id="cfg-url" placeholder="Cole qualquer link do Google Drive aqui..."/>
+        <p class="cfh">Cole o link de compartilhamento do Google Drive — o app extrai o ID automaticamente.</p>
       </div>
       <div class="cff">
         <label>Sincronização automática</label>
@@ -241,16 +241,19 @@ html,body{height:100%;font-family:'Sora',sans-serif;background:var(--g1);color:v
     </div>
 
     <div class="card">
-      <div class="clabel">Como obter o link do Google Drive</div>
+      <div class="clabel">Como configurar o Google Drive</div>
       <ol class="steps">
         <li>Abra o Google Drive e localize o arquivo <strong>DADOS_BUSSULA.xlsx</strong></li>
         <li>Clique com botão direito → <strong>Compartilhar</strong></li>
-        <li>Em "Acesso geral" selecione <strong>"Qualquer pessoa com o link"</strong> → Salvar</li>
-        <li>Clique em <strong>Copiar link</strong>. Será algo como:<br/><code>https://drive.google.com/file/d/<strong>SEUID</strong>/view?usp=sharing</code></li>
-        <li>Copie apenas o <strong>ID</strong> (trecho entre <code>/d/</code> e <code>/view</code>)</li>
-        <li>Monte a URL final assim:<br/><code>https://drive.google.com/uc?export=download&id=<strong>SEUID</strong></code></li>
-        <li>Cole essa URL no campo acima e toque em Salvar</li>
+        <li>Em "Acesso geral" selecione <strong>"Qualquer pessoa com o link"</strong> e salve</li>
+        <li>Clique em <strong>Copiar link</strong></li>
+        <li><strong>Cole diretamente</strong> no campo acima — o app converte automaticamente</li>
+        <li>Toque em <strong>💾 Salvar e sincronizar</strong></li>
       </ol>
+      <div style="margin-top:10px;padding:10px;background:var(--ap);border-radius:var(--rsm);">
+        <p style="font-size:11px;color:var(--ad);font-weight:600;">⚠️ Importante</p>
+        <p style="font-size:11px;color:var(--ad);margin-top:3px;">O arquivo <strong>deve</strong> estar compartilhado como "Qualquer pessoa com o link". Sem isso, o download será bloqueado pelo Google.</p>
+      </div>
     </div>
 
     <div class="card">
@@ -329,14 +332,66 @@ function iniciarSyncAuto(){
   if(cfg.interval>0&&cfg.url) syncTimer=setInterval(sincronizar,cfg.interval*60*1000);
 }
 
+// Extrai o file ID do Google Drive de qualquer formato de URL colado pelo usuário
+function extrairGDriveID(url){
+  // formato: /file/d/ID/view  ou  ?id=ID  ou  /open?id=ID
+  let m = url.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/);
+  if(m) return m[1];
+  m = url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+  if(m) return m[1];
+  return null;
+}
+
+// Monta as URLs a tentar em ordem de preferência
+function montarUrls(rawUrl){
+  const id = extrairGDriveID(rawUrl);
+  const urls = [];
+  if(id){
+    // 1. Export direto (funciona para arquivos pequenos sem aviso de vírus)
+    urls.push(`https://drive.google.com/uc?export=download&id=${id}&confirm=t`);
+    // 2. Export via docs.google (contorna o aviso de vírus do Drive)
+    urls.push(`https://docs.google.com/spreadsheets/export?id=${id}&exportFormat=xlsx`);
+    // 3. URL original com confirm
+    urls.push(rawUrl.includes('confirm') ? rawUrl : rawUrl + '&confirm=t');
+  } else {
+    urls.push(rawUrl);
+  }
+  return urls;
+}
+
+// Proxies CORS públicos em ordem de preferência
+const PROXIES = [
+  u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+  u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u => `https://cors-anywhere.herokuapp.com/${u}`,
+];
+
+async function tentarFetch(url){
+  for(const proxy of PROXIES){
+    try{
+      const res = await fetch(proxy(url), {signal: AbortSignal.timeout(10000)});
+      if(res.ok){
+        const buf = await res.arrayBuffer();
+        if(buf.byteLength > 100) return buf; // ignora respostas vazias/erro
+      }
+    }catch(_){ /* tenta próximo proxy */ }
+  }
+  return null;
+}
+
 async function sincronizar(){
   if(!cfg.url) return;
   document.getElementById('btn-sync').classList.add('spinning');
+  showStatus('config-status','inf','⏳ Sincronizando...');
   try{
-    const proxy='https://corsproxy.io/?'+encodeURIComponent(cfg.url);
-    const res=await fetch(proxy);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    processarXLSX(await res.arrayBuffer());
+    const urlsParaTentar = montarUrls(cfg.url);
+    let buf = null;
+    for(const url of urlsParaTentar){
+      buf = await tentarFetch(url);
+      if(buf) break;
+    }
+    if(!buf) throw new Error('Todas as tentativas falharam. Verifique se o arquivo está compartilhado como "Qualquer pessoa com o link".');
+    processarXLSX(buf);
     showStatus('config-status','ok','✔ Sincronizado com Google Drive');
     toast('Planilha atualizada ✔');
   }catch(e){
