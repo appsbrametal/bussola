@@ -1,12 +1,12 @@
 {
-  "name": "Bússula WM",
-  "short_name": "Bússula WM",
+  "name": "Bússula Brametal",
+  "short_name": "Bússula Brametal",
   "description": "Consulta de Quadrante WM por QR Code da OP — Google Drive Sync",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0a5c47",
-  "theme_color": "#0a5c47",
+  "background_color": "#8B0000",
+  "theme_color": "#8B0000",
   "lang": "pt-BR",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
