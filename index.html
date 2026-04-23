@@ -333,30 +333,38 @@ function iniciarSyncAuto(){
 }
 
 // Extrai o file ID do Google Drive de qualquer formato de URL colado pelo usuário
+// Extrai ID de qualquer URL do Google Drive ou Sheets
 function extrairGDriveID(url){
-  // formato: /file/d/ID/view  ou  ?id=ID  ou  /open?id=ID
-  let m = url.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/);
-  if(m) return m[1];
+  // Google Sheets: /spreadsheets/d/ID/
+  let m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{10,})/);
+  if(m) return { id: m[1], tipo: 'sheets' };
+  // Drive file: /file/d/ID/
+  m = url.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/);
+  if(m) return { id: m[1], tipo: 'drive' };
+  // Parametro ?id=
   m = url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
-  if(m) return m[1];
+  if(m) return { id: m[1], tipo: 'drive' };
   return null;
 }
 
-// Monta as URLs a tentar em ordem de preferência
+// Monta URLs para tentar em cascata
 function montarUrls(rawUrl){
-  const id = extrairGDriveID(rawUrl);
-  const urls = [];
-  if(id){
-    // 1. Export direto (funciona para arquivos pequenos sem aviso de vírus)
-    urls.push(`https://drive.google.com/uc?export=download&id=${id}&confirm=t`);
-    // 2. Export via docs.google (contorna o aviso de vírus do Drive)
-    urls.push(`https://docs.google.com/spreadsheets/export?id=${id}&exportFormat=xlsx`);
-    // 3. URL original com confirm
-    urls.push(rawUrl.includes('confirm') ? rawUrl : rawUrl + '&confirm=t');
+  const parsed = extrairGDriveID(rawUrl);
+  if(!parsed) return [rawUrl];
+  const { id, tipo } = parsed;
+  if(tipo === 'sheets'){
+    // Google Sheets: exportar como XLSX via endpoint publico
+    return [
+      `https://docs.google.com/spreadsheets/d/${id}/export?format=xlsx`,
+      `https://docs.google.com/spreadsheets/d/${id}/export?format=csv`,
+      `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv`,
+    ];
   } else {
-    urls.push(rawUrl);
+    return [
+      `https://drive.google.com/uc?export=download&id=${id}&confirm=t`,
+      `https://docs.google.com/spreadsheets/export?id=${id}&exportFormat=xlsx`,
+    ];
   }
-  return urls;
 }
 
 // Proxies CORS públicos em ordem de preferência
@@ -385,13 +393,13 @@ async function sincronizar(){
   showStatus('config-status','inf','⏳ Sincronizando...');
   try{
     const urlsParaTentar = montarUrls(cfg.url);
-    let buf = null;
+    let buf = null, usedUrl = null;
     for(const url of urlsParaTentar){
       buf = await tentarFetch(url);
-      if(buf) break;
+      if(buf){ usedUrl = url; break; }
     }
-    if(!buf) throw new Error('Todas as tentativas falharam. Verifique se o arquivo está compartilhado como "Qualquer pessoa com o link".');
-    processarXLSX(buf);
+    if(!buf) throw new Error('Falha ao baixar. Certifique-se que o arquivo está compartilhado como "Qualquer pessoa com o link" no Google Drive.');
+    processarBuf(buf, usedUrl);
     showStatus('config-status','ok','✔ Sincronizado com Google Drive');
     toast('Planilha atualizada ✔');
   }catch(e){
@@ -405,15 +413,25 @@ async function sincronizar(){
 function handleUpload(e){
   const f=e.target.files[0]; if(!f) return;
   const r=new FileReader();
-  r.onload=ev=>{processarXLSX(ev.target.result); showStatus('upload-status','ok','✔ '+f.name); toast('Planilha carregada ✔');};
+  r.onload=ev=>{processarBuf(ev.target.result, f.name); showStatus('upload-status','ok','✔ '+f.name); toast('Planilha carregada ✔');};
   r.readAsArrayBuffer(f);
 }
 
 // Colunas: OP | SIGLA | AREA | QUADRANTE | DESTINATÁRIO
-function processarXLSX(buf){
-  const wb=XLSX.read(buf,{type:'array'});
-  const ws=wb.Sheets[wb.SheetNames[0]];
-  const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+function processarBuf(buf, sourceUrl){
+  const isCsv = sourceUrl && (sourceUrl.includes('format=csv') || sourceUrl.includes('tqx=out:csv'));
+  let rows;
+  if(isCsv){
+    // Parseia CSV usando SheetJS
+    const text = new TextDecoder('utf-8').decode(buf);
+    const wb = XLSX.read(text, {type:'string'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    rows = XLSX.utils.sheet_to_json(ws,{defval:''});
+  } else {
+    const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+  }
   db={};
   const norm=k=>String(k).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   rows.forEach(r=>{
